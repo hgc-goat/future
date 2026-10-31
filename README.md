@@ -16,13 +16,37 @@
 | 5 | Dash 可交互页面 | 已完成 |
 | 6 | 完整测试 + README 跑通 | 已完成 |
 
-## 一键跑通
+## 一键启动
 
-从零生成数据、因子、回测、新闻融合、HGB 预测、漂移产物：
+安装依赖后，推荐直接运行启动脚本：
 
 ```bash
 cd "E:/python project/future"
 uv pip install -e ".[dev,ml,web]"
+
+python start.py
+# Windows 也可以双击 start.bat
+```
+
+`start.py` 会自动：
+
+1. 检测并切换到项目 `.venv`；
+2. 如果页面产物缺失，自动运行完整 `pipeline`；
+3. 启动 Dash（默认 `127.0.0.1:8050`）并打开浏览器。
+
+常用参数：
+
+```bash
+python start.py --rebuild          # 强制重新生成全部产物
+python start.py --port 8051        # 换端口
+python start.py --no-browser       # 不自动打开浏览器
+python start.py --build-only       # 只生成产物，不启动页面
+python start.py --debug            # Dash 调试模式
+```
+
+也可以手动分步：
+
+```bash
 python -m future.cli pipeline --seed 42
 python -m future.cli web --host 127.0.0.1 --port 8050
 # 打开 http://127.0.0.1:8050
@@ -38,7 +62,7 @@ pytest -q
 
 `pytest` 中包含一条端到端用例：在临时目录从零生成全部产物，再装载页面数据并创建 Dash 应用；不依赖仓库里已有的 `data/` 或 `artifacts/`。
 
-本机验收结果：`ruff` 通过；`pytest` **93 passed**；全量 `pipeline` 生成 37,560 行行情/资金流/新闻、576 行财务、31,296 行因子，并产出回测/新闻/HGB/漂移 artifacts。
+本机验收结果：`ruff` 通过；`pytest` **95 passed**；全量 `pipeline` 生成 37,560 行行情/资金流/新闻、576 行财务、31,296 行因子，并产出回测/新闻/HGB/漂移 artifacts。`python start.py --help` 与 `python start.py --port 8051 --no-browser` 已实测通过。
 
 ## 快速开始
 
@@ -389,6 +413,8 @@ FUTURE_SEED=7 FUTURE_DATA_SOURCE=mock FUTURE_DATA_DIR=data/mock \
 future/
 ├─ pyproject.toml
 ├─ README.md
+├─ start.py                  # 跨平台启动脚本
+├─ start.bat                 # Windows 双击入口
 ├─ .gitignore
 ├─ src/future/
 │  ├─ __init__.py
@@ -402,6 +428,7 @@ future/
 │  ├─ ml.py               # HGB 进阶模型 + 线性对比
 │  ├─ drift.py            # 滚动 IC / PSI / 0–1 严重度
 │  ├─ pipeline.py         # 一键阶段 1–4 流水线
+│  ├─ start.py            # 启动脚本核心逻辑
 │  ├─ web/
 │  │  ├─ data.py          # 页面数据装载
 │  │  ├─ app.py           # Dash 布局、回调和图表
