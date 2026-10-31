@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from future.web.data import load_dashboard_data
-from future.web.newsfeed import build_news_feed, build_outlook
+from future.web.newsfeed import build_news_digest, build_news_feed, build_outlook
 
 
 def test_news_feed_items(pipeline_artifacts) -> None:
@@ -35,3 +35,17 @@ def test_outlook_combines_news_financials_and_model(pipeline_artifacts) -> None:
     assert "新闻" in outlook.reasons[0]
     assert "财报" in outlook.reasons[1]
     assert "模型" in outlook.reasons[2]
+
+
+def test_news_digest_summarizes_directions(pipeline_artifacts) -> None:
+    root, _ = pipeline_artifacts
+    data = load_dashboard_data(root)
+    items = build_news_feed(data, limit=5)
+    digest = build_news_digest(items)
+
+    assert digest.total_items == 5
+    assert digest.bullish + digest.neutral + digest.bearish == 5
+    assert digest.total_news > 0
+    assert digest.top_sector
+    assert "同向确认" in digest.summary
+    assert digest.stance

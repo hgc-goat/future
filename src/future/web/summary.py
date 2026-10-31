@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from future.web.data import DashboardData
+from future.web.newsfeed import NewsItem
 
 DRIFT_LEVEL_CN = {"low": "低", "medium": "中", "high": "高"}
 FEATURE_CN = {
@@ -31,6 +33,26 @@ class Summary:
     bottom_probability: float
     drift_level: str
     drift_feature: str
+
+
+@dataclass(frozen=True)
+class DailyDigest:
+    """日报页的大盘趋势与新闻预测摘要。"""
+
+    market_label: str
+    breadth: float
+    average_probability: float
+    top_sector: str
+    top_probability: float
+    bottom_sector: str
+    bottom_probability: float
+    news_count: int
+    news_sentiment: float
+    news_bullish: int
+    news_neutral: int
+    news_bearish: int
+    top_news_headline: str
+    top_news_sector: str
 
 
 def _mean_ic(metrics: dict, model: str) -> float:
@@ -126,4 +148,48 @@ def build_summary(data: DashboardData) -> Summary:
     )
 
 
-__all__ = ["Summary", "build_summary"]
+def build_daily_digest(
+    data: DashboardData,
+    news_items: Sequence[NewsItem],
+) -> DailyDigest:
+    """把板块横截面和新闻推送压缩成日报页的两段摘要。"""
+
+    ranking = data.ranking.sort_values("rank")
+    top = ranking.iloc[0]
+    bottom = ranking.iloc[-1]
+    breadth = float((ranking["probability"] >= 50.0).mean() * 100.0)
+    average_probability = float(ranking["probability"].mean())
+    if average_probability >= 55.0 and breadth >= 60.0:
+        market_label = "板块整体偏暖"
+    elif average_probability <= 45.0 or breadth <= 35.0:
+        market_label = "板块整体偏冷"
+    else:
+        market_label = "板块分化"
+
+    news_count = int(sum(item.news_count for item in news_items))
+    weighted_sentiment = sum(item.sentiment * item.news_count for item in news_items)
+    news_sentiment = weighted_sentiment / news_count if news_count else 0.0
+    news_bullish = sum(item.direction == "相对偏强" for item in news_items)
+    news_bearish = sum(item.direction == "相对偏弱" for item in news_items)
+    news_neutral = len(news_items) - news_bullish - news_bearish
+    top_news = news_items[0] if news_items else None
+
+    return DailyDigest(
+        market_label=market_label,
+        breadth=breadth,
+        average_probability=average_probability,
+        top_sector=str(top["sector_name"]),
+        top_probability=float(top["probability"]),
+        bottom_sector=str(bottom["sector_name"]),
+        bottom_probability=float(bottom["probability"]),
+        news_count=news_count,
+        news_sentiment=news_sentiment,
+        news_bullish=news_bullish,
+        news_neutral=news_neutral,
+        news_bearish=news_bearish,
+        top_news_headline=top_news.headline if top_news else "暂无新闻推送",
+        top_news_sector=top_news.sector_name if top_news else "—",
+    )
+
+
+__all__ = ["DailyDigest", "Summary", "build_daily_digest", "build_summary"]

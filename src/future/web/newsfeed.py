@@ -39,6 +39,20 @@ class SectorOutlook:
 
 
 @dataclass(frozen=True)
+class NewsDigest:
+    total_items: int
+    total_news: int
+    average_sentiment: float
+    bullish: int
+    neutral: int
+    bearish: int
+    top_sector: str
+    top_headline: str
+    stance: str
+    summary: str
+
+
+@dataclass(frozen=True)
 class NewsItem:
     sector_id: str
     sector_name: str
@@ -165,6 +179,57 @@ def _headline(outlook: SectorOutlook) -> str:
     return f"{outlook.sector_name}：消息面平稳，等待资金流或财报给出方向"
 
 
+def build_news_digest(items: tuple[NewsItem, ...]) -> NewsDigest:
+    """总结今日新闻推送的共同方向与覆盖度。"""
+
+    if not items:
+        return NewsDigest(
+            total_items=0,
+            total_news=0,
+            average_sentiment=0.0,
+            bullish=0,
+            neutral=0,
+            bearish=0,
+            top_sector="—",
+            top_headline="暂无新闻推送",
+            stance="暂无足够新闻",
+            summary="当前没有可用的新闻样本，等待新数据。",
+        )
+
+    total_news = int(sum(item.news_count for item in items))
+    weighted = sum(item.sentiment * item.news_count for item in items)
+    average_sentiment = weighted / total_news if total_news else 0.0
+    bullish = sum(item.direction == "相对偏强" for item in items)
+    bearish = sum(item.direction == "相对偏弱" for item in items)
+    neutral = len(items) - bullish - bearish
+    top = max(items, key=lambda item: (item.news_count, item.score))
+
+    if bullish >= neutral + bearish and bullish >= max(1, len(items) // 2):
+        stance = "整体偏暖，但只作同向确认"
+    elif bearish >= bullish and bearish >= max(1, len(items) // 2):
+        stance = "整体偏冷，先降低信任"
+    else:
+        stance = "方向分化，等待更多确认"
+
+    summary = (
+        f"{len(items)} 条推送中 {bullish} 条偏强、{neutral} 条中性、{bearish} 条偏弱；"
+        f"近 5 日共 {total_news} 条新闻，平均情感 {average_sentiment:+.2f}。"
+        f"最受关注的是{top.sector_name}。新闻只做同向确认，不单独触发。"
+    )
+    return NewsDigest(
+        total_items=len(items),
+        total_news=total_news,
+        average_sentiment=average_sentiment,
+        bullish=bullish,
+        neutral=neutral,
+        bearish=bearish,
+        top_sector=top.sector_name,
+        top_headline=top.headline,
+        stance=stance,
+        summary=summary,
+    )
+
+
 def build_news_feed(data: DashboardData, limit: int = 5) -> tuple[NewsItem, ...]:
     """按新闻活跃度和情感强度挑选可解释的推送条目。"""
 
@@ -223,4 +288,11 @@ def build_news_feed(data: DashboardData, limit: int = 5) -> tuple[NewsItem, ...]
     return tuple(items)
 
 
-__all__ = ["NewsItem", "SectorOutlook", "build_news_feed", "build_outlook"]
+__all__ = [
+    "NewsDigest",
+    "NewsItem",
+    "SectorOutlook",
+    "build_news_digest",
+    "build_news_feed",
+    "build_outlook",
+]

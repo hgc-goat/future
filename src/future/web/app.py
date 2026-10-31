@@ -12,8 +12,15 @@ from dash import Dash, Input, Output, State, ctx, dash_table, dcc, html
 
 from future.data.base import DataSourceError
 from future.web.data import DashboardData, load_dashboard_data
-from future.web.newsfeed import NewsItem, SectorOutlook, build_news_feed, build_outlook
-from future.web.summary import build_summary
+from future.web.newsfeed import (
+    NewsDigest,
+    NewsItem,
+    SectorOutlook,
+    build_news_digest,
+    build_news_feed,
+    build_outlook,
+)
+from future.web.summary import build_daily_digest, build_summary
 
 ASSETS_DIR = Path(__file__).parent / "assets"
 
@@ -117,6 +124,7 @@ def _memo_section(summary) -> html.Section:
         for term, description in summary.glossary
     ]
     return html.Section(
+        id="page-daily-memo",
         className="memo",
         children=[
             html.Div(
@@ -405,10 +413,264 @@ def _outlook_card(outlook: SectorOutlook) -> html.Section:
     )
 
 
-def _news_section(items: tuple[NewsItem, ...], outlook: SectorOutlook) -> html.Section:
-    return html.Section(
-        className="news-grid",
+def _market_figure(ranking: pd.DataFrame) -> go.Figure:
+    fig = go.Figure(
+        go.Histogram(
+            x=ranking["probability"],
+            nbinsx=10,
+            marker={"color": BLUE, "line": {"width": 0}},
+            opacity=0.86,
+            hovertemplate="概率 %{x:.1f}%<br>%{y} 个板块<extra></extra>",
+        )
+    )
+    _base_layout(fig, 220, hovermode="x")
+    fig.update_xaxes(title_text="20 日相对胜率 (%)", range=[0, 100])
+    fig.update_yaxes(title_text="板块数", gridcolor=GRID)
+    fig.add_vline(x=50, line={"color": WARNING, "width": 1})
+    fig.add_annotation(
+        x=50,
+        y=1.06,
+        yref="paper",
+        text="50% 抛硬币线",
+        showarrow=False,
+        font={"color": WARNING, "size": 10},
+    )
+    return fig
+
+
+def _daily_stat(label: str, value: str, detail: str) -> html.Div:
+    return html.Div(
+        className="daily-stat",
         children=[
+            html.P(label, className="daily-stat-label"),
+            html.Div(value, className="daily-stat-value"),
+            html.P(detail, className="daily-stat-detail"),
+        ],
+    )
+
+
+def _daily_summary_section(
+    data: DashboardData,
+    digest,
+    news_items: tuple[NewsItem, ...],
+) -> html.Section:
+    top_news = news_items[0] if news_items else None
+    color = (
+        GOOD
+        if digest.news_bullish > digest.news_bearish
+        else CRITICAL
+        if digest.news_bearish > digest.news_bullish
+        else WARNING
+    )
+    return html.Section(
+        id="page-daily-summary",
+        className="daily-grid",
+        children=[
+            html.Section(
+                className="card daily-market-card",
+                children=[
+                    html.Div(
+                        className="card-head",
+                        children=[
+                            html.Div(
+                                [
+                                    html.P("MARKET / 今日大盘", className="eyebrow"),
+                                    html.H2("板块温度"),
+                                ]
+                            ),
+                            html.Span(digest.market_label, className="badge"),
+                        ],
+                    ),
+                    html.Div(
+                        className="daily-market-head",
+                        children=[
+                            _daily_stat(
+                                "相对胜率 ≥ 50%",
+                                f"{digest.breadth:.0f}%",
+                                "高于抛硬币线的板块占比",
+                            ),
+                            _daily_stat(
+                                "平均相对胜率",
+                                f"{digest.average_probability:.1f}%",
+                                "全部板块横截面均值",
+                            ),
+                            _daily_stat(
+                                "头部 - 尾部",
+                                f"{digest.top_probability - digest.bottom_probability:.1f}pp",
+                                f"{digest.top_sector} vs {digest.bottom_sector}",
+                            ),
+                        ],
+                    ),
+                    dcc.Graph(
+                        figure=_market_figure(data.ranking),
+                        config=PLOTLY_CONFIG,
+                        style={"height": "220px"},
+                    ),
+                    html.Div(
+                        className="daily-foot",
+                        children=[
+                            _chip(
+                                "头部",
+                                f"{digest.top_sector} {digest.top_probability:.1f}%",
+                                AQUA,
+                            ),
+                            _chip(
+                                "尾部",
+                                f"{digest.bottom_sector} {digest.bottom_probability:.1f}%",
+                                MUTED,
+                            ),
+                        ],
+                    ),
+                    html.P(
+                        "用板块横截面代理大盘温度，不是指数涨跌预测。",
+                        className="note",
+                    ),
+                ],
+            ),
+            html.Section(
+                className="card daily-news-card",
+                children=[
+                    html.Div(
+                        className="card-head",
+                        children=[
+                            html.Div(
+                                [
+                                    html.P("NEWS / 新闻预测总结", className="eyebrow"),
+                                    html.H2("今天新闻怎么说"),
+                                ]
+                            ),
+                            html.Span(
+                                f"近 5 日 · {len(news_items)} 条推送",
+                                className="card-hint",
+                            ),
+                        ],
+                    ),
+                    html.Div(
+                        className="daily-news-stats",
+                        children=[
+                            _daily_stat("新闻总量", str(digest.news_count), "近 5 个交易日"),
+                            _daily_stat(
+                                "平均情感",
+                                f"{digest.news_sentiment:+.2f}",
+                                "按新闻条数加权",
+                            ),
+                            _daily_stat(
+                                "偏强 / 偏弱",
+                                f"{digest.news_bullish} / {digest.news_bearish}",
+                                f"中性 {digest.news_neutral}",
+                            ),
+                        ],
+                    ),
+                    html.Div(
+                        className="daily-top-news",
+                        children=[
+                            html.P("最值得看的一条", className="eyebrow"),
+                            html.A(
+                                top_news.headline if top_news else "暂无新闻推送",
+                                href=top_news.url if top_news else "#",
+                                target="_blank",
+                                rel="noreferrer",
+                                className="news-title",
+                            ),
+                            html.P(
+                                top_news.summary if top_news else "新闻样本不足。",
+                                className="news-summary",
+                            ),
+                            html.Span(
+                                top_news.verdict if top_news else "观察",
+                                className="news-verdict",
+                                style={"color": color, "borderColor": color},
+                            ),
+                        ],
+                    ),
+                    html.Div(
+                        className="daily-news-more",
+                        children=[
+                            html.P("其他值得看", className="eyebrow"),
+                            *[
+                                html.Div(
+                                    className="daily-news-row",
+                                    children=[
+                                        html.Span(
+                                            item.sector_name,
+                                            className="daily-news-sector",
+                                        ),
+                                        html.A(
+                                            item.headline,
+                                            href=item.url,
+                                            target="_blank",
+                                            rel="noreferrer",
+                                            className="daily-news-title",
+                                        ),
+                                        html.Span(
+                                            item.direction,
+                                            style={"color": _direction_color(item.direction)},
+                                        ),
+                                    ],
+                                )
+                                for item in news_items[1:4]
+                            ],
+                        ],
+                    ),
+                    html.P(
+                        "完整推送、新闻链接和板块代理展望在“新闻”页。",
+                        className="note",
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def _news_summary_banner(digest: NewsDigest) -> html.Div:
+    color = GOOD if digest.bullish >= digest.bearish else CRITICAL
+    return html.Div(
+        className="news-summary-banner",
+        children=[
+            html.Div(
+                className="news-summary-copy",
+                children=[
+                    html.P("NEWS DIGEST / 新闻总结", className="eyebrow"),
+                    html.H2(digest.stance),
+                    html.P(digest.summary, className="news-summary-text"),
+                ],
+            ),
+            html.Div(
+                className="news-summary-stats",
+                children=[
+                    _daily_stat(
+                        "推送分布",
+                        f"{digest.bullish} / {digest.neutral} / {digest.bearish}",
+                        "偏强 / 中性 / 偏弱",
+                    ),
+                    _daily_stat(
+                        "平均情感",
+                        f"{digest.average_sentiment:+.2f}",
+                        f"近 5 日 {digest.total_news} 条新闻",
+                    ),
+                    _daily_stat(
+                        "最受关注",
+                        digest.top_sector,
+                        "新闻活跃度最高",
+                    ),
+                ],
+            ),
+            html.Span("同向确认", className="news-summary-seal", style={"borderColor": color}),
+        ],
+    )
+
+
+def _news_section(
+    items: tuple[NewsItem, ...],
+    outlook: SectorOutlook,
+    digest: NewsDigest,
+) -> html.Section:
+    return html.Section(
+        id="page-news",
+        className="news-grid",
+        style={"display": "none"},
+        children=[
+            _news_summary_banner(digest),
             html.Section(
                 className="card news-card",
                 children=[
@@ -870,6 +1132,8 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
     top = ranking.iloc[0]
     summary = build_summary(data)
     news_items = build_news_feed(data, limit=5)
+    news_digest = build_news_digest(news_items)
+    daily_digest = build_daily_digest(data, news_items)
     initial_outlook = build_outlook(data, default_sector)
 
     app = Dash(
@@ -912,8 +1176,42 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                     ),
                 ],
             ),
+            html.Nav(
+                className="page-nav",
+                children=[
+                    html.Button(
+                        "日报",
+                        id="nav-daily",
+                        n_clicks=0,
+                        type="button",
+                        className="nav-item nav-item--active",
+                    ),
+                    html.Button(
+                        "板块",
+                        id="nav-sectors",
+                        n_clicks=0,
+                        type="button",
+                        className="nav-item",
+                    ),
+                    html.Button(
+                        "新闻",
+                        id="nav-news",
+                        n_clicks=0,
+                        type="button",
+                        className="nav-item",
+                    ),
+                    html.Button(
+                        "模型健康",
+                        id="nav-health",
+                        n_clicks=0,
+                        type="button",
+                        className="nav-item",
+                    ),
+                ],
+            ),
             _memo_section(summary),
             html.Section(
+                id="page-daily-kpi",
                 className="kpi-grid",
                 children=[
                     _kpi(
@@ -943,8 +1241,11 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                     ),
                 ],
             ),
+            _daily_summary_section(data, daily_digest, news_items),
             html.Section(
+                id="page-sectors",
                 className="dashboard-grid",
+                style={"display": "none"},
                 children=[
                     html.Section(
                         className="card ranking-card",
@@ -1141,9 +1442,11 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                     ),
                 ],
             ),
-            _news_section(news_items, initial_outlook),
+            _news_section(news_items, initial_outlook, news_digest),
             html.Section(
+                id="page-health",
                 className="bottom-grid",
+                style={"display": "none"},
                 children=[
                     html.Section(
                         className="card drift-card",
@@ -1290,6 +1593,61 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
             dcc.Store(id="selected-sector", data=default_sector),
         ],
     )
+
+    def _switch_page(*_clicks: int) -> tuple[Any, ...]:
+        active = (ctx.triggered_id or "nav-daily").replace("nav-", "")
+        if active not in {"daily", "sectors", "news", "health"}:
+            active = "daily"
+        section_ids = (
+            "page-daily-memo",
+            "page-daily-kpi",
+            "page-daily-summary",
+            "page-sectors",
+            "page-news",
+            "page-health",
+        )
+        visible = {
+            "daily": {"page-daily-memo", "page-daily-kpi", "page-daily-summary"},
+            "sectors": {"page-sectors"},
+            "news": {"page-news"},
+            "health": {"page-health"},
+        }[active]
+        display_types = {
+            "page-daily-memo": "block",
+            "page-daily-kpi": "grid",
+            "page-daily-summary": "grid",
+            "page-sectors": "grid",
+            "page-news": "grid",
+            "page-health": "grid",
+        }
+        styles = [
+            {"display": display_types[section_id]} if section_id in visible else {"display": "none"}
+            for section_id in section_ids
+        ]
+        nav_classes = [
+            "nav-item nav-item--active" if active == "daily" else "nav-item",
+            "nav-item nav-item--active" if active == "sectors" else "nav-item",
+            "nav-item nav-item--active" if active == "news" else "nav-item",
+            "nav-item nav-item--active" if active == "health" else "nav-item",
+        ]
+        return (*styles, *nav_classes)
+
+    app.callback(
+        Output("page-daily-memo", "style"),
+        Output("page-daily-kpi", "style"),
+        Output("page-daily-summary", "style"),
+        Output("page-sectors", "style"),
+        Output("page-news", "style"),
+        Output("page-health", "style"),
+        Output("nav-daily", "className"),
+        Output("nav-sectors", "className"),
+        Output("nav-news", "className"),
+        Output("nav-health", "className"),
+        Input("nav-daily", "n_clicks"),
+        Input("nav-sectors", "n_clicks"),
+        Input("nav-news", "n_clicks"),
+        Input("nav-health", "n_clicks"),
+    )(_switch_page)
 
     def _select_sector(
         active_cell: dict[str, Any] | None,
