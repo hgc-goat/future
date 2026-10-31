@@ -62,7 +62,7 @@ pytest -q
 
 `pytest` 中包含一条端到端用例：在临时目录从零生成全部产物，再装载页面数据并创建 Dash 应用；不依赖仓库里已有的 `data/` 或 `artifacts/`。
 
-本机验收结果：`ruff` 通过；`pytest` **101 passed**；全量 `pipeline` 生成 37,560 行行情/资金流/新闻、576 行财务、31,296 行因子，并产出回测/新闻/HGB/漂移 artifacts。`python start.py --help` 与 `python start.py --port 8051 --no-browser` 已实测通过。
+本机验收结果：`ruff` 通过；`pytest` **104 passed**；全量 `pipeline` 生成 37,560 行行情/资金流/新闻、576 行财务、31,296 行因子，并产出回测/新闻/HGB/漂移 artifacts。`python start.py --help` 与 `python start.py --port 8051 --no-browser` 已实测通过。
 
 ## 快速开始
 
@@ -318,8 +318,9 @@ python -m future.web --host 127.0.0.1 --port 8050
 
 - `复制提示词`：把项目当前日期、模型前三板块、漂移状态、Mock 新闻摘要和完整研究要求复制到剪贴板；
 - `打开 DeepSeek 网页版`：在新标签页打开 `https://chat.deepseek.com/`，使用你已有的网页版登录态；
-- 项目**不自动调用 DeepSeek API，也不读取或保存登录态/Cookie**；
-- 网页版是否消耗额度、限流和频率由 DeepSeek 账户规则决定，本项目不保证“无限免费”。
+- **实验性本机浏览器自动化**：新闻页的“用本机浏览器生成日报（实验）”按钮会通过 browser-skill 打开一个 Agent Window，自动填入提示词、发送并读取回答，然后把结果展示在页面；
+- 项目**不调用 DeepSeek API，不读取或保存登录态/Cookie**；自动化只操作用户已登录的浏览器页面；
+- 网页版是否消耗额度、限流和频率由 DeepSeek 账户规则决定，不是 API token 免费通道；可能受风控、页面改版和使用条款限制，失败会自动提示回退到“复制 + 外链”。
 
 提示词由 `src/future/web/newsfeed.py::build_deepseek_prompt()` 动态生成，覆盖财报、公司公告、产业新闻、行业变化、来源链接、事实/推断区分和风险提示。
 

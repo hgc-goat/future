@@ -12,6 +12,7 @@ from dash import Dash, Input, Output, State, ctx, dash_table, dcc, html
 
 from future.data.base import DataSourceError
 from future.web.data import DashboardData, load_dashboard_data
+from future.web.deepseek_bridge import DeepSeekBridgeError, ask_deepseek
 from future.web.newsfeed import (
     NewsDigest,
     NewsItem,
@@ -688,6 +689,35 @@ def _ai_brief_card(prompt: str) -> html.Div:
                 children=[
                     html.Summary("查看完整提示词"),
                     html.Pre(prompt, className="prompt-text"),
+                ],
+            ),
+            html.Div(
+                className="deepseek-run",
+                children=[
+                    html.Div(
+                        [
+                            html.Button(
+                                "用本机浏览器生成日报（实验）",
+                                id="run-deepseek-btn",
+                                n_clicks=0,
+                                type="button",
+                                className="run-deepseek",
+                            ),
+                            html.P(
+                                "需要已登录 DeepSeek 的 Edge；会打开自动化窗口，"
+                                "可能受风控/使用条款限制；失败请用复制 + 外链。",
+                                className="deepseek-warning",
+                            ),
+                        ]
+                    ),
+                    dcc.Loading(
+                        html.Div(
+                            id="deepseek-result",
+                            className="deepseek-result",
+                            children="尚未生成。",
+                        ),
+                        type="circle",
+                    ),
                 ],
             ),
         ],
@@ -1689,6 +1719,38 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
         Input("nav-news", "n_clicks"),
         Input("nav-health", "n_clicks"),
     )(_switch_page)
+
+    @app.callback(
+        Output("deepseek-result", "children"),
+        Input("run-deepseek-btn", "n_clicks"),
+        State("prompt-store", "data"),
+        prevent_initial_call=True,
+    )
+    def _run_deepseek(n_clicks: int, prompt: str) -> Any:
+        if not n_clicks:
+            return "尚未生成。"
+        try:
+            result = ask_deepseek(prompt)
+        except DeepSeekBridgeError as exc:
+            return html.Div(
+                [
+                    html.P(f"自动生成失败：{exc}", className="deepseek-error"),
+                    html.P(
+                        "不影响当前页面；可以继续复制提示词并打开 DeepSeek 网页版。",
+                        className="deepseek-meta",
+                    ),
+                ]
+            )
+        return html.Div(
+            [
+                html.P(
+                    f"来自 DeepSeek 网页版 · 用时 {result.duration_seconds:.1f}s · "
+                    "AI 输出请自行核验",
+                    className="deepseek-meta",
+                ),
+                dcc.Markdown(result.answer, className="deepseek-answer"),
+            ]
+        )
 
     def _select_sector(
         active_cell: dict[str, Any] | None,

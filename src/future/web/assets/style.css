@@ -1798,3 +1798,82 @@ h1 {
 
 
 }
+
+.deepseek-run {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.run-deepseek {
+  padding: 9px 12px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  cursor: pointer;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.run-deepseek:hover {
+  color: var(--blue);
+  border-color: var(--blue);
+}
+
+.deepseek-warning,
+.deepseek-meta {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.deepseek-result {
+  min-height: 34px;
+  padding: 8px 10px;
+  color: var(--secondary);
+  font-size: 11px;
+  line-height: 1.5;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.deepseek-answer {
+  margin-top: 8px;
+  color: var(--secondary);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.deepseek-answer h1,
+.deepseek-answer h2,
+.deepseek-answer h3 {
+  color: var(--text);
+}
+
+.deepseek-answer a {
+  color: var(--blue);
+}
+
+.deepseek-error {
+  margin: 0;
+  color: var(--critical);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .deepseek-run {
+    grid-template-columns: 1fr;
+  }
+}
+
+.deepseek-result {
+  max-height: 720px;
+  overflow-y: auto;
+}
