@@ -12,22 +12,23 @@ from dash import Dash, Input, Output, State, ctx, dash_table, dcc, html
 
 from future.data.base import DataSourceError
 from future.web.data import DashboardData, load_dashboard_data
+from future.web.summary import build_summary
 
 ASSETS_DIR = Path(__file__).parent / "assets"
 
-PAGE = "#0d0d0d"
-SURFACE = "#1a1a19"
-SURFACE_2 = "#222220"
-TEXT = "#ffffff"
-SECONDARY = "#c3c2b7"
-MUTED = "#898781"
-GRID = "#2c2c2a"
-BASELINE = "#383835"
-BORDER = "rgba(255,255,255,0.10)"
+PAGE = "#090e13"
+SURFACE = "#111821"
+SURFACE_2 = "#18222c"
+TEXT = "#f5f7f4"
+SECONDARY = "#b8c4c0"
+MUTED = "#7e8c88"
+GRID = "#24313a"
+BASELINE = "#35444c"
+BORDER = "rgba(255,255,255,0.11)"
 BLUE = "#3987e5"
 AQUA = "#199e70"
-YELLOW = "#c98500"
-RED = "#e66767"
+YELLOW = "#d9a441"
+RED = "#e5725b"
 GOOD = "#0ca30c"
 WARNING = "#fab219"
 CRITICAL = "#d03b3b"
@@ -99,6 +100,90 @@ def _chip(label: str, value: str, accent: str = BLUE) -> html.Div:
         children=[
             html.Span(label, className="chip-label"),
             html.Span(value, className="chip-value", style={"color": accent}),
+        ],
+    )
+
+
+def _memo_section(summary) -> html.Section:
+    glossary_items = [
+        html.Div(
+            className="glossary-item",
+            children=[
+                html.Span(term, className="glossary-term"),
+                html.Span(description, className="glossary-copy"),
+            ],
+        )
+        for term, description in summary.glossary
+    ]
+    return html.Section(
+        className="memo",
+        children=[
+            html.Div(
+                className="memo-top",
+                children=[
+                    html.Div(
+                        className="memo-main",
+                        children=[
+                            html.Div(
+                                className="memo-kicker",
+                                children=[
+                                    html.Span("BRIEFING"),
+                                    html.Span(
+                                        "给第一次看的人",
+                                        className="memo-kicker-note",
+                                    ),
+                                ],
+                            ),
+                            html.H2(summary.headline, className="memo-headline"),
+                            html.P(summary.stance, className="memo-stance"),
+                            html.P(
+                                "它不预测绝对涨跌，只比较板块之间的相对强弱。",
+                                className="memo-scope",
+                            ),
+                            html.Ul(
+                                [html.Li(text) for text in summary.bullets],
+                                className="memo-bullets",
+                            ),
+                        ],
+                    ),
+                    html.Aside(
+                        className="memo-side",
+                        children=[
+                            html.Div(
+                                className="memo-stamp",
+                                children=[
+                                    html.Span("MOCK"),
+                                    html.Strong("20D"),
+                                    html.Span("相对胜率"),
+                                ],
+                            ),
+                            html.Div(
+                                className="memo-principles",
+                                children=[
+                                    html.P("读数顺序", className="memo-side-title"),
+                                    html.Ol(
+                                        [
+                                            html.Li("先看最高概率有没有明显高于 50%"),
+                                            html.Li("再看漂移是否升到中/高"),
+                                            html.Li("最后看回测能不能区分强弱"),
+                                        ],
+                                        className="memo-steps",
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            html.Details(
+                className="memo-glossary",
+                open=False,
+                children=[
+                    html.Summary("术语速查 · 第一次看先读这 9 个词"),
+                    html.Div(className="glossary-grid", children=glossary_items),
+                ],
+            ),
+            html.P(summary.caveat, className="memo-caveat"),
         ],
     )
 
@@ -266,9 +351,7 @@ def _psi_figure(drift: dict[str, Any]) -> go.Figure:
         )
     )
     _base_layout(fig, 230)
-    fig.update_xaxes(
-        title_text="PSI（训练期 vs 最近 20 日）", range=[0, max(0.5, max_value * 1.35)]
-    )
+    fig.update_xaxes(title_text="分布变化（越高越需谨慎）", range=[0, max(0.5, max_value * 1.35)])
     fig.update_yaxes(gridcolor="rgba(0,0,0,0)", automargin=True)
     fig.add_vline(x=0.25, line={"color": MUTED, "width": 1})
     fig.add_annotation(
@@ -533,6 +616,7 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
     severity = drift["severity"]
     severity_level = LEVEL_LABEL.get(severity["level"], severity["level"])
     top = ranking.iloc[0]
+    summary = build_summary(data)
 
     app = Dash(
         __name__,
@@ -554,10 +638,10 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                             html.Div("F", className="brand-mark"),
                             html.Div(
                                 [
-                                    html.P("FUTURE / SIGNAL LAB", className="eyebrow"),
+                                    html.P("FUTURE / SIGNAL MEMO", className="eyebrow"),
                                     html.H1("板块趋势概率"),
                                     html.P(
-                                        "20 日相对胜率 · 结构因子 · 新闻确认 · 漂移监控",
+                                        "先读人话结论，再看证据。",
                                         className="subtitle",
                                     ),
                                 ]
@@ -569,43 +653,38 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                         children=[
                             html.Span("数据截止"),
                             html.Strong(data.latest_date.strftime("%Y-%m-%d")),
-                            html.Span("· Mock", className="muted-inline"),
+                            html.Span("· 20D 相对胜率 · Mock", className="muted-inline"),
                         ],
                     ),
                 ],
             ),
+            _memo_section(summary),
             html.Section(
                 className="kpi-grid",
                 children=[
                     _kpi(
-                        "最新交易日",
-                        data.latest_date.strftime("%Y-%m-%d"),
-                        f"{len(ranking)} 个板块 · {data.probability_source}",
+                        "模型最偏好的板块",
+                        f"{top['probability']:.1f}%",
+                        f"{top['sector_name']} · 线性分数 {top['linear_score']:+.2f}",
                         BLUE,
                     ),
                     _kpi(
-                        "最高 20 日胜率",
-                        f"{top['probability']:.1f}%",
-                        f"{top['sector_name']} · 线性 {top['linear_score']:+.2f}",
+                        "历史预测力 IC",
+                        f"{hgb_ic:.3f}",
+                        f"线性融合 {baseline_ic:.3f} · 越高越能区分强弱",
                         AQUA,
                     ),
                     _kpi(
-                        "HGB 20 日 OOS IC",
-                        f"{hgb_ic:.4f}",
-                        f"线性融合 {baseline_ic:.4f}",
-                        BLUE,
-                    ),
-                    _kpi(
-                        "HGB 多空年化",
+                        "历史多空年化",
                         _fmt_pct(hgb_long_short["annualized_return"]),
                         f"Sharpe {hgb_long_short['sharpe']:.2f} · "
-                        f"MDD {_fmt_pct(hgb_long_short['max_drawdown'])}",
+                        f"最大回撤 {_fmt_pct(hgb_long_short['max_drawdown'])}",
                         AQUA,
                     ),
                     _kpi(
-                        "漂移严重度",
+                        "漂移预警",
                         f"{severity['overall']:.2f}",
-                        f"{severity_level} · {drift['latest']['date'] or '—'}",
+                        f"{severity_level} · 最大变化：{summary.drift_feature}",
                         LEVEL_COLOR.get(severity["level"], WARNING),
                     ),
                 ],
@@ -626,7 +705,7 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                                         ]
                                     ),
                                     html.Span(
-                                        "可排序 · 可筛选 · 点击行或选择框查看归因",
+                                        "可排序 · 可搜索 · 点一行看它为什么被选中",
                                         className="card-hint",
                                     ),
                                 ],
@@ -643,7 +722,16 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                                         placeholder="选择板块",
                                         className="sector-select",
                                     ),
-                                    html.Span("概率来自 HGB 模型", className="muted-inline"),
+                                    dcc.Input(
+                                        id="sector-search",
+                                        type="search",
+                                        placeholder="搜索板块…",
+                                        className="sector-search",
+                                    ),
+                                    html.Span(
+                                        "概率是 20 日相对胜率，不是涨跌幅",
+                                        className="muted-inline",
+                                    ),
                                 ],
                             ),
                             dash_table.DataTable(
@@ -651,7 +739,7 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                                 columns=table_columns,
                                 data=table_data,
                                 sort_action="native",
-                                filter_action="native",
+                                filter_action="none",
                                 page_action="native",
                                 page_size=12,
                                 row_selectable="single",
@@ -730,7 +818,10 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                                 children=[
                                     html.Div(
                                         [
-                                            html.P("SELECTED SECTOR", className="eyebrow"),
+                                            html.P(
+                                                "SELECTED SECTOR / 选中板块",
+                                                className="eyebrow",
+                                            ),
                                             html.H2(
                                                 id="detail-name",
                                                 children=default_row["sector_name"],
@@ -755,7 +846,7 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                                 children=[
                                     html.Div(
                                         className="chart-caption",
-                                        children="线性因子贡献 · 归因口径",
+                                        children="它为什么被选中 · 线性贡献",
                                     ),
                                     dcc.Graph(
                                         id="attribution-chart",
@@ -770,7 +861,7 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                                 children=[
                                     html.Div(
                                         className="chart-caption",
-                                        children="近 252 个交易日价格",
+                                        children="价格走势 · 近 252 个交易日",
                                     ),
                                     dcc.Graph(
                                         id="price-chart",
@@ -788,8 +879,8 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                                 children=_factor_grid(default_row),
                             ),
                             html.P(
-                                "注：HGB 是分类模型的概率输出，不提供线性归因；"
-                                "上方归因对应 composite_fused。",
+                                "线性贡献只解释 composite_fused；"
+                                "HGB 概率来自分类模型，无法直接拆成因子贡献。",
                                 className="note",
                             ),
                         ],
@@ -807,8 +898,8 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                                 children=[
                                     html.Div(
                                         [
-                                            html.P("MONITORING", className="eyebrow"),
-                                            html.H2("漂移预警"),
+                                            html.P("SIGNAL HEALTH / 漂移监控", className="eyebrow"),
+                                            html.H2("模型还靠谱吗？"),
                                         ]
                                     ),
                                     html.Span(
@@ -822,6 +913,11 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                                         },
                                     ),
                                 ],
+                            ),
+                            html.P(
+                                "分数越高，越应该把排序当作参考而不是结论。"
+                                f"当前最大变化来自{summary.drift_feature}；这是模型健康度，不是涨跌信号。",
+                                className="card-lede",
                             ),
                             html.Div(
                                 className="drift-grid",
@@ -849,8 +945,10 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                             html.Div(
                                 className="chip-row compact",
                                 children=[
-                                    _chip("IC 严重度", f"{severity['ic']:.2f}", BLUE),
-                                    _chip("分布严重度", f"{severity['distribution']:.2f}", WARNING),
+                                    _chip("预测力变化", f"{severity['ic']:.2f}", BLUE),
+                                    _chip(
+                                        "数据分布变化", f"{severity['distribution']:.2f}", WARNING
+                                    ),
                                     _chip(
                                         "最新滚动 IC",
                                         f"{drift['latest']['rolling_ic']:.4f}"
@@ -870,12 +968,17 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                                 children=[
                                     html.Div(
                                         [
-                                            html.P("BACKTEST", className="eyebrow"),
-                                            html.H2("样本外回测摘要"),
+                                            html.P("BACKTEST / 回测说明", className="eyebrow"),
+                                            html.H2("历史表现，不是预测"),
                                         ]
                                     ),
                                     html.Span("2024–2025 · 未计成本", className="card-hint"),
                                 ],
+                            ),
+                            html.P(
+                                "IC 看模型有没有区分强弱的能力；多空年化看排序在历史样本里的收益。"
+                                "它们都不是未来收益承诺。",
+                                className="card-lede",
                             ),
                             html.Div(
                                 className="compare-grid",
@@ -883,7 +986,7 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                                     html.Div(
                                         className="compare-card",
                                         children=[
-                                            html.P("线性融合 IC20", className="kpi-label"),
+                                            html.P("线性融合 20 日 IC", className="kpi-label"),
                                             html.Div(
                                                 f"{baseline_ic:.4f}",
                                                 className="compare-value",
@@ -898,7 +1001,7 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                                     html.Div(
                                         className="compare-card",
                                         children=[
-                                            html.P("HGB IC20", className="kpi-label"),
+                                            html.P("HGB 20 日 IC", className="kpi-label"),
                                             html.Div(
                                                 f"{hgb_ic:.4f}", className="compare-value accent"
                                             ),
@@ -974,6 +1077,19 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
         Input("sector-select", "value"),
         State("selected-sector", "data"),
     )(_select_sector)
+
+    def _filter_table(query: str | None) -> list[dict[str, Any]]:
+        if not query:
+            return table_data
+        normalized = query.strip().lower()
+        if not normalized:
+            return table_data
+        return [row for row in table_data if normalized in str(row["sector_name"]).lower()]
+
+    app.callback(
+        Output("ranking-table", "data"),
+        Input("sector-search", "value"),
+    )(_filter_table)
 
     def _update_detail(sector_id: str | None) -> tuple[Any, ...]:
         selected = sector_id if sector_id in ranking_index.index else default_sector

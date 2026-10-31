@@ -62,7 +62,7 @@ pytest -q
 
 `pytest` 中包含一条端到端用例：在临时目录从零生成全部产物，再装载页面数据并创建 Dash 应用；不依赖仓库里已有的 `data/` 或 `artifacts/`。
 
-本机验收结果：`ruff` 通过；`pytest` **95 passed**；全量 `pipeline` 生成 37,560 行行情/资金流/新闻、576 行财务、31,296 行因子，并产出回测/新闻/HGB/漂移 artifacts。`python start.py --help` 与 `python start.py --port 8051 --no-browser` 已实测通过。
+本机验收结果：`ruff` 通过；`pytest` **96 passed**；全量 `pipeline` 生成 37,560 行行情/资金流/新闻、576 行财务、31,296 行因子，并产出回测/新闻/HGB/漂移 artifacts。`python start.py --help` 与 `python start.py --port 8051 --no-browser` 已实测通过。
 
 ## 快速开始
 
@@ -291,11 +291,14 @@ python -m future.web --host 127.0.0.1 --port 8050
 
 页面特性：
 
-- DataTable 原生排序、筛选、分页；点击行或使用选择框选择板块；
+- 顶部“一分钟读懂”晨报便签：动态生成人话结论、四条阅读提示、读数顺序和术语速查；
+- DataTable 原生排序、分页；顶部提供板块搜索框；点击行或使用选择框选择板块；
 - 下拉框搜索板块；
 - 归因图为线性 `composite_fused` 分解，HGB 概率单独展示并明确标注不可线性分解；
-- 深色主题、Plotly 图表、无外部 CDN 依赖；
-- 页面数据来自本地 artifacts，不调用外部行情服务。
+- 深色数据工作台 + 浅色研究便签的视觉层级；显示字体、等宽小标签和数据表各有角色；
+- 无外部 CDN 依赖，页面数据来自本地 artifacts，不调用外部行情服务。
+
+总结模块由 `src/future/web/summary.py` 的 `build_summary()` 生成，直接读取当前排名、漂移、新闻覆盖和 HGB/线性回测指标；没有金融背景也可以先读结论，再按术语速查理解证据。
 
 浏览器验证（Edge 156 / browser-skill 0.4.0）：
 
@@ -431,8 +434,9 @@ future/
 │  ├─ start.py            # 启动脚本核心逻辑
 │  ├─ web/
 │  │  ├─ data.py          # 页面数据装载
+│  │  ├─ summary.py       # 通俗结论、阅读提示与术语速查
 │  │  ├─ app.py           # Dash 布局、回调和图表
-│  │  └─ assets/style.css # 深色主题
+│  │  └─ assets/style.css # 深色工作台 + 晨报便签视觉系统
 │  └─ data/
 │     ├─ base.py          # Dataset / DataAdapter / FallbackAdapter
 │     ├─ mock.py          # 确定性 Mock 生成
