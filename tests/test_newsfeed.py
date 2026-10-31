@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from future.web.data import load_dashboard_data
-from future.web.newsfeed import build_news_digest, build_news_feed, build_outlook
+from future.web.newsfeed import (
+    build_deepseek_prompt,
+    build_news_digest,
+    build_news_feed,
+    build_outlook,
+)
 
 
 def test_news_feed_items(pipeline_artifacts) -> None:
@@ -49,3 +54,19 @@ def test_news_digest_summarizes_directions(pipeline_artifacts) -> None:
     assert digest.top_sector
     assert "同向确认" in digest.summary
     assert digest.stance
+
+
+def test_deepseek_prompt_covers_news_and_fundamentals(pipeline_artifacts) -> None:
+    root, _ = pipeline_artifacts
+    data = load_dashboard_data(root)
+    items = build_news_feed(data, limit=5)
+    digest = build_news_digest(items)
+    prompt = build_deepseek_prompt(data, digest, items)
+
+    assert "财报" in prompt
+    assert "产业新闻" in prompt
+    assert "公司公告" in prompt
+    assert "来源" in prompt
+    assert "未验证" in prompt
+    assert "数据是 Mock" in prompt
+    assert data.latest_date.strftime("%Y-%m-%d") in prompt

@@ -230,6 +230,57 @@ def build_news_digest(items: tuple[NewsItem, ...]) -> NewsDigest:
     )
 
 
+def build_deepseek_prompt(
+    data: DashboardData,
+    digest: NewsDigest,
+    news_items: tuple[NewsItem, ...],
+) -> str:
+    """生成给 DeepSeek 网页版复制使用的日报提示词。"""
+
+    top_sectors = data.ranking.sort_values("rank").head(3)
+    top_lines = "\n".join(
+        f"- {row['sector_name']}：相对胜率 {float(row['probability']):.1f}%"
+        for _, row in top_sectors.iterrows()
+    )
+    severity = data.drift["severity"]
+    level = {"low": "低", "medium": "中", "high": "高"}.get(
+        str(severity["level"]), str(severity["level"])
+    )
+    headline_examples = "\n".join(
+        f"- {item.sector_name}：{item.headline}" for item in news_items[:3]
+    )
+    return f"""你是我的中文金融研究助理。请生成一份“今日财经与产业新闻日报”，
+优先使用你能访问到的最新公开信息，并写明每条信息的发布日期和来源链接。
+如果无法获取实时新闻，请直接说明信息截止时间，不要假装知道今天发生了什么。
+
+【项目上下文：仅作对照，数据是 Mock，不能当作事实】
+- 项目数据截止：{data.latest_date.strftime("%Y-%m-%d")}
+- 模型相对胜率前三：
+{top_lines}
+- 当前漂移：{level}（{float(severity["overall"]):.2f}）
+- 项目内 Mock 新闻摘要：{digest.summary}
+- Mock 推送示例：
+{headline_examples}
+
+请重点覆盖：
+1. 财报与业绩预告：哪些公司或行业披露了重要财报、业绩预告、指引变化，是否超预期；
+2. 公司公告与重大事项：并购、回购、增持、减持、订单、产能、监管处罚等；
+3. 产业新闻与行业变化：政策、供需、价格、库存、技术迭代、竞争格局；
+4. 可能影响 A 股板块的资金、情绪和宏观线索；
+5. 与上面项目信号的关系：哪些信息同向、哪些冲突，原因是什么。
+
+输出格式：
+一、今日三条结论：每条写“事实 + 影响方向 + 受影响板块/公司 + 置信度 + 来源”；
+二、公司财报与公告；
+三、产业新闻与行业变化；
+四、与项目信号的关系；
+五、明日观察清单；
+六、风险与不确定项；
+七、来源链接列表。
+
+严格区分“事实”和“推断”；没有来源链接的内容标注“未验证”，不要编造链接或新闻；不要给出具体买卖建议；用通俗中文解释术语，面向没有金融背景的读者。如果无法获取今天的实时信息，请明确说明数据限制，并改用你能确认的最新信息。"""
+
+
 def build_news_feed(data: DashboardData, limit: int = 5) -> tuple[NewsItem, ...]:
     """按新闻活跃度和情感强度挑选可解释的推送条目。"""
 
@@ -292,6 +343,7 @@ __all__ = [
     "NewsDigest",
     "NewsItem",
     "SectorOutlook",
+    "build_deepseek_prompt",
     "build_news_digest",
     "build_news_feed",
     "build_outlook",

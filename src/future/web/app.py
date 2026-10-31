@@ -16,6 +16,7 @@ from future.web.newsfeed import (
     NewsDigest,
     NewsItem,
     SectorOutlook,
+    build_deepseek_prompt,
     build_news_digest,
     build_news_feed,
     build_outlook,
@@ -647,10 +648,57 @@ def _news_summary_banner(digest: NewsDigest) -> html.Div:
     )
 
 
+def _ai_brief_card(prompt: str) -> html.Div:
+    return html.Div(
+        className="ai-brief",
+        children=[
+            html.Div(
+                className="ai-brief-copy",
+                children=[
+                    html.P("AI BRIEF / 外部咨询", className="eyebrow"),
+                    html.H2("让 AI 做今日新闻总结"),
+                    html.P(
+                        "复制提示词，到 DeepSeek 网页版生成今日真实新闻日报。"
+                        "本项目不自动调用 API，也不读取你的登录态。",
+                        className="ai-brief-description",
+                    ),
+                ],
+            ),
+            html.Div(
+                className="ai-brief-actions",
+                children=[
+                    html.Button(
+                        "复制提示词",
+                        id="copy-prompt-btn",
+                        type="button",
+                        className="copy-prompt",
+                    ),
+                    html.A(
+                        "打开 DeepSeek 网页版 ↗",
+                        href="https://chat.deepseek.com/",
+                        target="_blank",
+                        rel="noreferrer",
+                        className="deepseek-link",
+                    ),
+                ],
+            ),
+            html.Details(
+                className="prompt-details",
+                open=False,
+                children=[
+                    html.Summary("查看完整提示词"),
+                    html.Pre(prompt, className="prompt-text"),
+                ],
+            ),
+        ],
+    )
+
+
 def _news_section(
     items: tuple[NewsItem, ...],
     outlook: SectorOutlook,
     digest: NewsDigest,
+    prompt: str,
 ) -> html.Section:
     return html.Section(
         id="page-news",
@@ -658,6 +706,7 @@ def _news_section(
         style={"display": "none"},
         children=[
             _news_summary_banner(digest),
+            _ai_brief_card(prompt),
             html.Section(
                 className="card news-card",
                 children=[
@@ -1110,6 +1159,7 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
     summary = build_summary(data)
     news_items = build_news_feed(data, limit=5)
     news_digest = build_news_digest(news_items)
+    deepseek_prompt = build_deepseek_prompt(data, news_digest, news_items)
     daily_digest = build_daily_digest(data, news_items)
     initial_outlook = build_outlook(data, default_sector)
 
@@ -1419,7 +1469,7 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                     ),
                 ],
             ),
-            _news_section(news_items, initial_outlook, news_digest),
+            _news_section(news_items, initial_outlook, news_digest, deepseek_prompt),
             html.Section(
                 id="page-health",
                 className="bottom-grid",
@@ -1568,7 +1618,21 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                 children="future · Mock 数据展示 · 不构成投资建议",
             ),
             dcc.Store(id="selected-sector", data=default_sector),
+            dcc.Store(id="prompt-store", data=deepseek_prompt),
         ],
+    )
+
+    app.clientside_callback(
+        """function(n_clicks, prompt) {
+            if (!n_clicks) { return "复制提示词"; }
+            if (prompt && navigator.clipboard) {
+                navigator.clipboard.writeText(prompt);
+            }
+            return "已复制";
+        }""",
+        Output("copy-prompt-btn", "children"),
+        Input("copy-prompt-btn", "n_clicks"),
+        State("prompt-store", "data"),
     )
 
     def _switch_page(*_clicks: int) -> tuple[Any, ...]:

@@ -62,7 +62,7 @@ pytest -q
 
 `pytest` 中包含一条端到端用例：在临时目录从零生成全部产物，再装载页面数据并创建 Dash 应用；不依赖仓库里已有的 `data/` 或 `artifacts/`。
 
-本机验收结果：`ruff` 通过；`pytest` **100 passed**；全量 `pipeline` 生成 37,560 行行情/资金流/新闻、576 行财务、31,296 行因子，并产出回测/新闻/HGB/漂移 artifacts。`python start.py --help` 与 `python start.py --port 8051 --no-browser` 已实测通过。
+本机验收结果：`ruff` 通过；`pytest` **101 passed**；全量 `pipeline` 生成 37,560 行行情/资金流/新闻、576 行财务、31,296 行因子，并产出回测/新闻/HGB/漂移 artifacts。`python start.py --help` 与 `python start.py --port 8051 --no-browser` 已实测通过。
 
 ## 快速开始
 
@@ -311,6 +311,17 @@ python -m future.web --host 127.0.0.1 --port 8050
 - 无外部 CDN 依赖，页面数据来自本地 artifacts，不调用外部行情服务。
 
 总结模块由 `src/future/web/summary.py` 的 `build_summary()` 和 `build_daily_digest()` 生成，直接读取当前排名、漂移、新闻覆盖和 HGB/线性回测指标；没有金融背景也可以先读结论，再按术语速查理解证据。
+
+## AI 日报与外部咨询
+
+新闻页顶部提供 **AI BRIEF / 外部咨询** 卡片：
+
+- `复制提示词`：把项目当前日期、模型前三板块、漂移状态、Mock 新闻摘要和完整研究要求复制到剪贴板；
+- `打开 DeepSeek 网页版`：在新标签页打开 `https://chat.deepseek.com/`，使用你已有的网页版登录态；
+- 项目**不自动调用 DeepSeek API，也不读取或保存登录态/Cookie**；
+- 网页版是否消耗额度、限流和频率由 DeepSeek 账户规则决定，本项目不保证“无限免费”。
+
+提示词由 `src/future/web/newsfeed.py::build_deepseek_prompt()` 动态生成，覆盖财报、公司公告、产业新闻、行业变化、来源链接、事实/推断区分和风险提示。
 
 ## 新闻推送与板块展望
 
