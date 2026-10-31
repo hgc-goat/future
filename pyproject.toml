@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "future"
+version = "0.1.0"
+description = "板块趋势概率评估系统：Mock 数据、因子、回测、漂移监控"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "future contributors" }]
+dependencies = [
+    "numpy>=1.26,<3",
+    "pandas>=2.2,<4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<10",
+    "ruff>=0.6,<1",
+]
+web = [
+    "dash>=4.5,<5",
+    "plotly>=7.1,<8",
+]
+ml = [
+    "scikit-learn>=1.4,<2",
+]
+
+[project.scripts]
+future = "future.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/future"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "PTH"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["src"]
