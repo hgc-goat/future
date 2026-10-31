@@ -103,7 +103,7 @@ def build_summary(data: DashboardData) -> Summary:
         (
             f"先看概率：最高是{top['sector_name']} {top_probability:.1f}%，"
             f"最低是{bottom['sector_name']} {bottom_probability:.1f}%。"
-            "50% 约等于抛硬币，65% 也意味着约三分之一概率会跑输板块中位数。"
+            "这是相对胜率，不是涨跌幅；即使是 65%，也仍有约三分之一概率跑输板块中位数。"
         ),
         (
             f"再看漂移：当前{level_cn}（{float(severity['overall']):.2f}），"

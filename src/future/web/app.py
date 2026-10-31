@@ -24,22 +24,22 @@ from future.web.summary import build_daily_digest, build_summary
 
 ASSETS_DIR = Path(__file__).parent / "assets"
 
-PAGE = "#090e13"
-SURFACE = "#111821"
-SURFACE_2 = "#18222c"
-TEXT = "#f5f7f4"
-SECONDARY = "#b8c4c0"
-MUTED = "#7e8c88"
-GRID = "#24313a"
-BASELINE = "#35444c"
-BORDER = "rgba(255,255,255,0.11)"
-BLUE = "#3987e5"
-AQUA = "#199e70"
-YELLOW = "#d9a441"
-RED = "#e5725b"
-GOOD = "#0ca30c"
-WARNING = "#fab219"
-CRITICAL = "#d03b3b"
+PAGE = "#f3f2ec"
+SURFACE = "#ffffff"
+SURFACE_2 = "#f4f5f0"
+TEXT = "#1c211d"
+SECONDARY = "#505850"
+MUTED = "#747d73"
+GRID = "#e5e3db"
+BASELINE = "#cbc8be"
+BORDER = "rgba(20,30,22,0.13)"
+BLUE = "#2a78d6"
+AQUA = "#148a61"
+YELLOW = "#b7791f"
+RED = "#d84b4b"
+GOOD = "#2f8f4e"
+WARNING = "#b7791f"
+CRITICAL = "#c0392b"
 
 PLOTLY_CONFIG = {"displayModeBar": False, "responsive": True}
 FONT_FAMILY = 'system-ui, -apple-system, "Segoe UI", sans-serif'
@@ -53,8 +53,8 @@ def _base_layout(fig: go.Figure, height: int, *, hovermode: str = "closest") -> 
         height=height,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font={"family": FONT_FAMILY, "color": SECONDARY, "size": 12},
-        margin={"l": 8, "r": 12, "t": 8, "b": 28},
+        font={"family": FONT_FAMILY, "color": SECONDARY, "size": 13},
+        margin={"l": 8, "r": 12, "t": 8, "b": 32},
         hovermode=hovermode,
         showlegend=False,
         hoverlabel={
@@ -67,16 +67,16 @@ def _base_layout(fig: go.Figure, height: int, *, hovermode: str = "closest") -> 
         gridcolor=GRID,
         zerolinecolor=BASELINE,
         linecolor=BASELINE,
-        tickfont={"color": MUTED, "size": 11},
-        title_font={"color": MUTED, "size": 11},
+        tickfont={"color": MUTED, "size": 12},
+        title_font={"color": MUTED, "size": 12},
         automargin=True,
     )
     fig.update_yaxes(
         gridcolor=GRID,
         zerolinecolor=BASELINE,
         linecolor=BASELINE,
-        tickfont={"color": MUTED, "size": 11},
-        title_font={"color": MUTED, "size": 11},
+        tickfont={"color": MUTED, "size": 12},
+        title_font={"color": MUTED, "size": 12},
         automargin=True,
     )
     return fig
@@ -426,15 +426,6 @@ def _market_figure(ranking: pd.DataFrame) -> go.Figure:
     _base_layout(fig, 220, hovermode="x")
     fig.update_xaxes(title_text="20 日相对胜率 (%)", range=[0, 100])
     fig.update_yaxes(title_text="板块数", gridcolor=GRID)
-    fig.add_vline(x=50, line={"color": WARNING, "width": 1})
-    fig.add_annotation(
-        x=50,
-        y=1.06,
-        yref="paper",
-        text="50% 抛硬币线",
-        showarrow=False,
-        font={"color": WARNING, "size": 10},
-    )
     return fig
 
 
@@ -487,7 +478,7 @@ def _daily_summary_section(
                             _daily_stat(
                                 "相对胜率 ≥ 50%",
                                 f"{digest.breadth:.0f}%",
-                                "高于抛硬币线的板块占比",
+                                "相对胜率高于 50% 的板块占比",
                             ),
                             _daily_stat(
                                 "平均相对胜率",
@@ -612,10 +603,6 @@ def _daily_summary_section(
                             ],
                         ],
                     ),
-                    html.P(
-                        "完整推送、新闻链接和板块代理展望在“新闻”页。",
-                        className="note",
-                    ),
                 ],
             ),
         ],
@@ -687,8 +674,7 @@ def _news_section(
                         ],
                     ),
                     html.P(
-                        "这些是根据 Mock 新闻情感、财报因子和模型概率生成的简报，不是实时抓取；"
-                        "标题会打开东方财富的相关新闻搜索。",
+                        "Mock 摘要；标题打开东方财富相关新闻搜索。",
                         className="card-lede",
                     ),
                     html.Div(
@@ -867,15 +853,6 @@ def _psi_figure(drift: dict[str, Any]) -> go.Figure:
     _base_layout(fig, 230)
     fig.update_xaxes(title_text="分布变化（越高越需谨慎）", range=[0, max(0.5, max_value * 1.35)])
     fig.update_yaxes(gridcolor="rgba(0,0,0,0)", automargin=True)
-    fig.add_vline(x=0.25, line={"color": MUTED, "width": 1})
-    fig.add_annotation(
-        x=0.25,
-        y=1.06,
-        yref="paper",
-        text="0.25",
-        showarrow=False,
-        font={"color": MUTED, "size": 10},
-    )
     return fig
 
 
@@ -1305,7 +1282,7 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                                     "backgroundColor": "rgba(0,0,0,0)",
                                     "color": MUTED,
                                     "fontWeight": "600",
-                                    "fontSize": "11px",
+                                    "fontSize": "12px",
                                     "letterSpacing": "0.08em",
                                     "textTransform": "uppercase",
                                     "borderBottom": f"1px solid {GRID}",
@@ -1323,7 +1300,7 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                                     "borderBottom": f"1px solid {GRID}",
                                     "padding": "9px 10px",
                                     "fontFamily": FONT_FAMILY,
-                                    "fontSize": "13px",
+                                    "fontSize": "14px",
                                     "textAlign": "left",
                                     "minWidth": "80px",
                                 },
@@ -1340,7 +1317,7 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                                 style_data_conditional=[
                                     {
                                         "if": {"row_index": "odd"},
-                                        "backgroundColor": "rgba(255,255,255,0.012)",
+                                        "backgroundColor": "rgba(20,30,22,0.025)",
                                     },
                                     {
                                         "if": {"column_id": "probability"},
@@ -1353,12 +1330,12 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                                     },
                                     {
                                         "if": {"state": "selected"},
-                                        "backgroundColor": "rgba(57, 135, 229, 0.18)",
+                                        "backgroundColor": "rgba(42, 120, 214, 0.13)",
                                         "color": TEXT,
                                     },
                                     {
                                         "if": {"state": "active"},
-                                        "backgroundColor": "rgba(57, 135, 229, 0.12)",
+                                        "backgroundColor": "rgba(42, 120, 214, 0.10)",
                                         "color": TEXT,
                                     },
                                 ],

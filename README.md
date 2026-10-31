@@ -134,7 +134,7 @@ ruff format --check .
 pytest -q
 ```
 
-Windows PowerShell 激活命令为 `.venv\Scripts\Activate.ps1`。也可以使用 `python -m venv .venv` + `pip install -e ".[dev,ml]"`。
+Windows PowerShell 激活命令为 `.venv\Scripts\Activate.ps1`。也可以使用 `python -m venv .venv` + `pip install -e ".[dev,ml,web]"`。
 
 ## 数据设计
 
@@ -307,7 +307,7 @@ python -m future.web --host 127.0.0.1 --port 8050
 - DataTable 原生排序、分页；顶部提供板块搜索框；点击行或使用选择框选择板块；
 - 下拉框搜索板块；
 - 归因图为线性 `composite_fused` 分解，HGB 概率单独展示并明确标注不可线性分解；
-- 深色数据工作台 + 浅色研究便签的视觉层级；显示字体、等宽小标签和数据表各有角色；
+- 浅色研究台 + 薄雾绿晨报便签的视觉层级；正文、表格和图表字号整体放大；显示字体、等宽小标签和数据表各有角色；
 - 无外部 CDN 依赖，页面数据来自本地 artifacts，不调用外部行情服务。
 
 总结模块由 `src/future/web/summary.py` 的 `build_summary()` 和 `build_daily_digest()` 生成，直接读取当前排名、漂移、新闻覆盖和 HGB/线性回测指标；没有金融背景也可以先读结论，再按术语速查理解证据。
@@ -476,7 +476,7 @@ future/
 │  │  ├─ summary.py       # 通俗结论、阅读提示与术语速查
 │  │  ├─ newsfeed.py      # 新闻推送、板块展望与代理标的说明
 │  │  ├─ app.py           # Dash 布局、回调和图表
-│  │  └─ assets/style.css # 深色工作台 + 晨报便签视觉系统
+│  │  └─ assets/style.css # 浅色工作台 + 晨报便签视觉系统
 │  └─ data/
 │     ├─ base.py          # Dataset / DataAdapter / FallbackAdapter
 │     ├─ mock.py          # 确定性 Mock 生成
