@@ -62,7 +62,7 @@ pytest -q
 
 `pytest` 中包含一条端到端用例：在临时目录从零生成全部产物，再装载页面数据并创建 Dash 应用；不依赖仓库里已有的 `data/` 或 `artifacts/`。
 
-本机验收结果：`ruff` 通过；`pytest` **96 passed**；全量 `pipeline` 生成 37,560 行行情/资金流/新闻、576 行财务、31,296 行因子，并产出回测/新闻/HGB/漂移 artifacts。`python start.py --help` 与 `python start.py --port 8051 --no-browser` 已实测通过。
+本机验收结果：`ruff` 通过；`pytest` **98 passed**；全量 `pipeline` 生成 37,560 行行情/资金流/新闻、576 行财务、31,296 行因子，并产出回测/新闻/HGB/漂移 artifacts。`python start.py --help` 与 `python start.py --port 8051 --no-browser` 已实测通过。
 
 ## 快速开始
 
@@ -292,6 +292,8 @@ python -m future.web --host 127.0.0.1 --port 8050
 页面特性：
 
 - 顶部“一分钟读懂”晨报便签：动态生成人话结论、四条阅读提示、读数顺序和术语速查；
+- 今日推送新闻卡：近 5 日新闻摘要、外部搜索链接、方向判断与置信度；
+- 板块展望：新闻 + 财报 + 模型 + 拥挤度的可解释晚融合，支持板块 / 跟踪基金 / 成分股代理模式；
 - DataTable 原生排序、分页；顶部提供板块搜索框；点击行或使用选择框选择板块；
 - 下拉框搜索板块；
 - 归因图为线性 `composite_fused` 分解，HGB 概率单独展示并明确标注不可线性分解；
@@ -299,6 +301,33 @@ python -m future.web --host 127.0.0.1 --port 8050
 - 无外部 CDN 依赖，页面数据来自本地 artifacts，不调用外部行情服务。
 
 总结模块由 `src/future/web/summary.py` 的 `build_summary()` 生成，直接读取当前排名、漂移、新闻覆盖和 HGB/线性回测指标；没有金融背景也可以先读结论，再按术语速查理解证据。
+
+## 新闻推送与板块展望
+
+`src/future/web/newsfeed.py` 提供两个输出：
+
+1. **今日推送**：按近 5 个交易日新闻活跃度、情感强度和模型分数挑选板块，生成新闻标题、摘要、方向判断和置信度；标题/底部链接打开东方财富的相关新闻搜索。摘要来自 Mock 数据，不伪造文章 URL。
+2. **板块展望**：把四类信号做可解释的晚融合：
+
+```text
+方向分 = 50% HGB 相对胜率 + 30% 新闻情感分 + 20% 财报景气分 - 拥挤度扣分
+新闻分 = clip(50 + 50 × 近 5 日加权情感, 0, 100)
+财报分 = clip(50 + 12 × 财务景气因子 z, 0, 100)
+置信度 ≈ 0.35 + 0.3 × 三路信号同向程度 + 0.2 × 新闻覆盖
+```
+
+- 当前 Mock 数据只到板块级；页面的“跟踪基金 / ETF（代理）”和“成分股（代理）”明确标注为板块代理，不代表具体证券代码。
+- 新闻信号采用 5 日窗口和同向确认计数；新闻不足、情感冲突或拥挤度过高时，判断会更保守。
+- 算法参考：FinBERT 情绪 + XGBoost/结构化事件特征、新闻与财务多模态融合、新闻显著性与时间衰减研究。生产化时应接入真实新闻源、FinBERT 类模型和公司级财报，而不是用 Mock 情感替代。
+
+参考：
+
+- [Beyond Sentiment: Structured Information Extraction from Financial News](https://browse-export.arxiv.org/pdf/2607.28496)
+- [IKNet: Keyword-Guided News + Technical Indicator Fusion](https://browse-export.arxiv.org/pdf/2510.07661)
+- [FinBERT + XGBoost for Event-Driven Stock Prediction](https://www.zenodo.org/records/20011255/files/Vykuntapu_FDAStock_Prediction_2026.pdf?download=1)
+- [RavenPack: The Timing Edge — News Sentiment Horizon](https://marketing-prod.ravenpack.com/blog/the-timing-edge-new-research-unlocks-stronger-alpha-from-news-sentiment)
+- [Heston & Sinha: News vs. Sentiment — Predicting Stock Returns](https://www.tandfonline.com/doi/abs/10.2469/faj.v73.n3.3)
+- [Sentiment-Driven Sector Forecasting](https://ieeexplore.ieee.org/document/11381075)
 
 浏览器验证（Edge 156 / browser-skill 0.4.0）：
 
@@ -435,6 +464,7 @@ future/
 │  ├─ web/
 │  │  ├─ data.py          # 页面数据装载
 │  │  ├─ summary.py       # 通俗结论、阅读提示与术语速查
+│  │  ├─ newsfeed.py      # 新闻推送、板块展望与代理标的说明
 │  │  ├─ app.py           # Dash 布局、回调和图表
 │  │  └─ assets/style.css # 深色工作台 + 晨报便签视觉系统
 │  └─ data/

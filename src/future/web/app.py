@@ -12,6 +12,7 @@ from dash import Dash, Input, Output, State, ctx, dash_table, dcc, html
 
 from future.data.base import DataSourceError
 from future.web.data import DashboardData, load_dashboard_data
+from future.web.newsfeed import NewsItem, SectorOutlook, build_news_feed, build_outlook
 from future.web.summary import build_summary
 
 ASSETS_DIR = Path(__file__).parent / "assets"
@@ -184,6 +185,257 @@ def _memo_section(summary) -> html.Section:
                 ],
             ),
             html.P(summary.caveat, className="memo-caveat"),
+        ],
+    )
+
+
+def _direction_color(direction: str) -> str:
+    if direction == "相对偏强":
+        return GOOD
+    if direction == "相对偏弱":
+        return CRITICAL
+    return WARNING
+
+
+def _news_item_article(item: NewsItem) -> html.Article:
+    color = _direction_color(item.direction)
+    sentiment_label = (
+        "偏正面" if item.sentiment > 0.15 else "偏负面" if item.sentiment < -0.15 else "中性"
+    )
+    return html.Article(
+        className="news-item",
+        children=[
+            html.Div(
+                className="news-meta",
+                children=[
+                    html.Span("MOCK NEWS", className="news-source"),
+                    html.Span(item.published_at, className="news-date"),
+                    html.Span(item.sector_name, className="news-sector"),
+                    html.Span(sentiment_label, style={"color": color}),
+                ],
+            ),
+            html.A(
+                item.headline,
+                href=item.url,
+                target="_blank",
+                rel="noreferrer",
+                className="news-title",
+            ),
+            html.P(item.summary, className="news-summary"),
+            html.Div(
+                className="news-footer",
+                children=[
+                    html.Span(
+                        item.verdict,
+                        className="news-verdict",
+                        style={"color": color, "borderColor": color},
+                    ),
+                    html.A(
+                        "搜索相关报道 ↗",
+                        href=item.url,
+                        target="_blank",
+                        rel="noreferrer",
+                        className="news-link",
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def _outlook_component(
+    label: str,
+    value: float,
+    detail: str,
+    color: str,
+) -> html.Div:
+    return html.Div(
+        className="outlook-component",
+        children=[
+            html.Div(
+                className="outlook-component-head",
+                children=[
+                    html.Span(label),
+                    html.Span(f"{value:.0f}", style={"color": color}),
+                ],
+            ),
+            html.Div(
+                className="outlook-track",
+                children=[
+                    html.Div(
+                        className="outlook-fill",
+                        style={"width": f"{value:.0f}%", "background": color},
+                    )
+                ],
+            ),
+            html.P(detail, className="outlook-component-note"),
+        ],
+    )
+
+
+def _outlook_components(outlook: SectorOutlook) -> list[Any]:
+    return [
+        _outlook_component(
+            "新闻",
+            outlook.news_score,
+            f"情感 {outlook.sentiment:+.2f} · {int(outlook.news_count)} 条",
+            BLUE,
+        ),
+        _outlook_component(
+            "财报",
+            outlook.financial_score,
+            f"财务因子 z={outlook.financial:+.2f}",
+            AQUA,
+        ),
+        _outlook_component(
+            "模型",
+            outlook.model_score,
+            f"20 日相对胜率 {outlook.probability:.1f}%",
+            YELLOW,
+        ),
+        html.Div(
+            className="outlook-crowding",
+            children=[
+                html.Span("拥挤度扣分"),
+                html.Span(f"{outlook.crowding:+.2f}"),
+            ],
+        ),
+    ]
+
+
+def _outlook_proxy_note(target_type: str) -> str:
+    if target_type == "板块指数":
+        return "当前是板块级相对方向，不是个股或基金的买卖建议。"
+    if target_type == "跟踪基金 / ETF（代理）":
+        return "当前 Mock 数据没有基金持仓和净值，使用同板块信号代理；不代表具体基金代码。"
+    return "当前 Mock 数据没有公司级财报与公告，使用同板块信号代理；不代表具体个股。"
+
+
+def _outlook_card(outlook: SectorOutlook) -> html.Section:
+    return html.Section(
+        className="card outlook-card",
+        children=[
+            html.Div(
+                className="card-head",
+                children=[
+                    html.Div(
+                        [
+                            html.P("OUTLOOK / 板块展望", className="eyebrow"),
+                            html.H2("未来 20 天怎么看"),
+                        ]
+                    ),
+                    html.Span("相对方向 · 不是涨跌预测", className="card-hint"),
+                ],
+            ),
+            html.Div(
+                className="outlook-head",
+                children=[
+                    html.Div(
+                        [
+                            html.P("当前关注对象", className="eyebrow"),
+                            html.H3(id="outlook-sector", children=outlook.sector_name),
+                            html.P(
+                                id="outlook-meta",
+                                className="outlook-meta",
+                                children="板块级信号 · 在主排序表中选择其他板块会同步更新",
+                            ),
+                        ]
+                    ),
+                    html.Div(
+                        className="outlook-score-block",
+                        children=[
+                            html.Div(
+                                id="outlook-score",
+                                className="outlook-score",
+                                children=f"{outlook.score:.0f}",
+                            ),
+                            html.P("综合方向分 / 100", className="outlook-score-label"),
+                            html.Div(
+                                id="outlook-direction",
+                                className="outlook-direction",
+                                style={
+                                    "color": _direction_color(outlook.direction),
+                                    "borderColor": _direction_color(outlook.direction),
+                                },
+                                children=outlook.direction,
+                            ),
+                            html.P(
+                                id="outlook-confidence",
+                                className="outlook-confidence",
+                                children=f"置信度 {outlook.confidence:.0%}",
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            dcc.RadioItems(
+                id="target-type",
+                options=[
+                    {"label": "板块指数", "value": "板块指数"},
+                    {"label": "跟踪基金 / ETF（代理）", "value": "跟踪基金 / ETF（代理）"},
+                    {"label": "成分股（代理）", "value": "成分股（代理）"},
+                ],
+                value="板块指数",
+                inline=True,
+                className="target-switch",
+                inputStyle={"marginRight": "5px", "accentColor": BLUE},
+                labelStyle={"marginRight": "14px"},
+            ),
+            html.Div(
+                id="outlook-components",
+                className="outlook-components",
+                children=_outlook_components(outlook),
+            ),
+            html.Ul(
+                id="outlook-reasons",
+                className="outlook-reasons",
+                children=[html.Li(reason) for reason in outlook.reasons],
+            ),
+            html.P(
+                "方向分 = 50% 模型 + 30% 新闻 + 20% 财报 − 拥挤度扣分；"
+                "置信度看三路信号是否同向、新闻覆盖是否足够。",
+                className="outlook-formula",
+            ),
+            html.P(
+                id="outlook-proxy-note",
+                className="outlook-proxy-note",
+                children=_outlook_proxy_note("板块指数"),
+            ),
+        ],
+    )
+
+
+def _news_section(items: tuple[NewsItem, ...], outlook: SectorOutlook) -> html.Section:
+    return html.Section(
+        className="news-grid",
+        children=[
+            html.Section(
+                className="card news-card",
+                children=[
+                    html.Div(
+                        className="card-head",
+                        children=[
+                            html.Div(
+                                [
+                                    html.P("NEWS WIRE / 今日推送", className="eyebrow"),
+                                    html.H2("新闻与判断"),
+                                ]
+                            ),
+                            html.Span("模拟摘要 · 标题跳转相关搜索", className="card-hint"),
+                        ],
+                    ),
+                    html.P(
+                        "这些是根据 Mock 新闻情感、财报因子和模型概率生成的简报，不是实时抓取；"
+                        "标题会打开东方财富的相关新闻搜索。",
+                        className="card-lede",
+                    ),
+                    html.Div(
+                        className="news-list",
+                        children=[_news_item_article(item) for item in items],
+                    ),
+                ],
+            ),
+            _outlook_card(outlook),
         ],
     )
 
@@ -617,6 +869,8 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
     severity_level = LEVEL_LABEL.get(severity["level"], severity["level"])
     top = ranking.iloc[0]
     summary = build_summary(data)
+    news_items = build_news_feed(data, limit=5)
+    initial_outlook = build_outlook(data, default_sector)
 
     app = Dash(
         __name__,
@@ -887,6 +1141,7 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
                     ),
                 ],
             ),
+            _news_section(news_items, initial_outlook),
             html.Section(
                 className="bottom-grid",
                 children=[
@@ -1090,6 +1345,43 @@ def create_app(data: DashboardData | None = None, root: Path | str = Path()) -> 
         Output("ranking-table", "data"),
         Input("sector-search", "value"),
     )(_filter_table)
+
+    def _update_outlook(
+        sector_id: str | None,
+        target_type: str | None,
+    ) -> tuple[Any, ...]:
+        outlook = build_outlook(data, sector_id)
+        color = _direction_color(outlook.direction)
+        meta = (
+            f"HGB 相对胜率 {outlook.probability:.1f}% · "
+            f"财务 z={outlook.financial:+.2f} · "
+            f"5 日新闻 {int(outlook.news_count)} 条"
+        )
+        return (
+            outlook.sector_name,
+            meta,
+            f"{outlook.score:.0f}",
+            outlook.direction,
+            {"color": color, "borderColor": color},
+            f"置信度 {outlook.confidence:.0%}",
+            _outlook_components(outlook),
+            [html.Li(reason) for reason in outlook.reasons],
+            _outlook_proxy_note(target_type or "板块指数"),
+        )
+
+    app.callback(
+        Output("outlook-sector", "children"),
+        Output("outlook-meta", "children"),
+        Output("outlook-score", "children"),
+        Output("outlook-direction", "children"),
+        Output("outlook-direction", "style"),
+        Output("outlook-confidence", "children"),
+        Output("outlook-components", "children"),
+        Output("outlook-reasons", "children"),
+        Output("outlook-proxy-note", "children"),
+        Input("selected-sector", "data"),
+        Input("target-type", "value"),
+    )(_update_outlook)
 
     def _update_detail(sector_id: str | None) -> tuple[Any, ...]:
         selected = sector_id if sector_id in ranking_index.index else default_sector

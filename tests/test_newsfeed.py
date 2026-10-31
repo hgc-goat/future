@@ -1,0 +1,37 @@
+from __future__ import annotations
+
+from future.web.data import load_dashboard_data
+from future.web.newsfeed import build_news_feed, build_outlook
+
+
+def test_news_feed_items(pipeline_artifacts) -> None:
+    root, _ = pipeline_artifacts
+    data = load_dashboard_data(root)
+    items = build_news_feed(data, limit=5)
+
+    assert len(items) == 5
+    for item in items:
+        assert item.sector_name
+        assert item.headline
+        assert item.summary
+        assert item.url.startswith("https://")
+        assert item.direction in {"相对偏强", "中性", "相对偏弱"}
+        assert 0.0 <= item.confidence <= 1.0
+        assert 0.0 <= item.score <= 100.0
+
+
+def test_outlook_combines_news_financials_and_model(pipeline_artifacts) -> None:
+    root, _ = pipeline_artifacts
+    data = load_dashboard_data(root)
+    top_sector = str(data.ranking.sort_values("rank").iloc[0]["sector_id"])
+    outlook = build_outlook(data, top_sector)
+
+    assert outlook.sector_id == top_sector
+    assert 0.0 <= outlook.score <= 100.0
+    assert 0.0 <= outlook.news_score <= 100.0
+    assert 0.0 <= outlook.financial_score <= 100.0
+    assert 0.0 <= outlook.model_score <= 100.0
+    assert len(outlook.reasons) == 4
+    assert "新闻" in outlook.reasons[0]
+    assert "财报" in outlook.reasons[1]
+    assert "模型" in outlook.reasons[2]
