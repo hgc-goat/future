@@ -25,3 +25,7 @@ manifest.json
 # 本地配置与密钥
 .env
 .env.*
+
+# IDE
+.idea/
+.vscode/
